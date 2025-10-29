@@ -29,6 +29,24 @@
    </main>
    <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoianZhbmxhcmUiLCJhIjoiY21oY2Zrd29nMTN2dDJtcHh5YzlxYWVtNSJ9.bP5BGQT-tdmmsC1SStqvNw'
+
+let map = new mapboxgl.Map({
+    container: 'map', // container ID
+    style: 'mapbox://styles/mapbox/satellite-v9', // style URL
+    zoom: 5.5, // starting zoom
+    center: [138, 38] // starting center
+});
+
+async function geojsonFetch() {
+    let response, earthquakes, japan;
+    response = await fetch('assets/earthquakes.geojson');
+    earthquakes = await response.json();
+    response = await fetch('assets/japan.json');
+    japan = await response.json();
+    console.log(earthquakes, japan); // just to check if it loaded
+}
+
+geojsonFetch();
    </script>
  </body>   
 </html>
