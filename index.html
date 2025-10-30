@@ -2,64 +2,186 @@
 
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Mapbox Points Example</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
-  <style>
+    <meta charset="utf-8">
+    <title>Interactive Map with Multiple GeoJSONs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
     body { margin: 0; padding: 0; }
     #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-  </style>
+
+
+/* Side panel styling */
+#side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 300px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    overflow-y: auto;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    }
+
+
+#side-panel h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+
+th, td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+
+th {
+    cursor: pointer;
+    background-color: #f2f2f2;
+}
+
+
+@media (max-width: 1024px) {
+    #side-panel {
+    display: none;
+}
+}
+</style>
 </head>
 <body>
-  <div id="map"></div>
+    <div id="map"></div>
+    <div id="side-panel">
+        <h2>Map of Two GeoJSON Layers</h2>
+        <table id="info-table">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Name</th>
+                    <th onclick="sortTable(1)">Category</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <tr>
+                    <td>Places I've lived</td>
+                    <td>Points</td>
+                </tr>
+                <tr>
+                    <td>2015 Road Trip</td>
+                    <td>Lines</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
   <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoianZhbmxhcmUiLCJhIjoiY21oY2Zrd29nMTN2dDJtcHh5YzlxYWVtNSJ9.bP5BGQT-tdmmsC1SStqvNw';
 
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/outdoors-v12',
       center: [-98, 39], // Roughly center of U.S.
       zoom: 3
     });
 
     map.on('load', () => {
-      // Add your GeoJSON points
-      map.addSource('myData', {
-        type: 'geojson',
-        data: 'assets/map (2).geojson'
-      });
+        const geojsonFiles = [
+            { name: 'Layer 1', path: 'assets/map (2).geojson', color: '#FF0000' },
+            { name: 'Layer 2', path: 'assets/map (3).geojson', color: '#1E90FF' }
+];
 
-      // Add circle layer for points
-      map.addLayer({
-        id: 'myData-points',
-        type: 'circle',
-        source: 'myData',
-        paint: {
-          'circle-radius': 8,
-          'circle-color': '#FF0000',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#fff'
-        }
-      });
+    const bounds = new mapboxgl.LngLatBounds();
 
-      // Zoom to points
-      fetch('assets/map (2).geojson')
-        .then(res => res.json())
-        .then(data => {
-          const bounds = new mapboxgl.LngLatBounds();
-          data.features.forEach(f => {
+
+    geojsonFiles.forEach(layer => {
+        map.addSource(layer.name, {
+            type: 'geojson',
+            data: layer.path
+        });
+
+        if (layer.name === 'Layer 2') {
+        map.addLayer({
+            id: layer.name + '-lines',
+            type: 'line',
+            source: layer.name,
+            paint: {
+                'line-width': 3,
+                'line-color': layer.color
+            }
+        });
+    } else {
+        map.addLayer({
+            id: layer.name + '-points',
+            type: 'circle',
+            source: layer.name,
+            paint: {
+                'circle-radius': 8,
+                'circle-color': layer.color,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#fff'
+            }
+        });
+    }
+    });
+
+
+fetch(layer.path)
+    .then(res => res.json())
+    .then(data => {
+        data.features.forEach(f => {
             const c = f.geometry.coordinates;
             bounds.extend(c);
-          });
-          if (!bounds.isEmpty()) {
-            map.fitBounds(bounds, { padding: 50 });
-          }
-        });
-    });
-  </script>
 
-</body>
-</html>
+
+            const props = f.properties;
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${props.name || 'N/A'}</td><td>${props.category || layer.name}</td>`;
+            document.getElementById('table-body').appendChild(row);
+        });
+
+
+        map.fitBounds(bounds, { padding: 50 });
+    });
+});
+
+
+// Sort table by column
+function sortTable(n) {
+    const table = document.getElementById('info-table');
+    let switching = true;
+    let dir = 'asc';
+    while (switching) {
+        switching = false;
+        const rows = table.rows;
+        for (let i = 1; i < rows.length - 1; i++) {
+            let shouldSwitch = false;
+            const x = rows[i].getElementsByTagName('TD')[n];
+            const y = rows[i + 1].getElementsByTagName('TD')[n];
+            if (dir === 'asc' && x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                shouldSwitch = true;
+                break;
+            } else if (dir === 'desc' && x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                shouldSwitch = true;
+                break;
+            }
+        }
+        if (shouldSwitch) {
+            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+            switching = true;
+        } else if (!switching && dir === 'asc') {
+            dir = 'desc';
+            switching = true;
+        }
+    }
+    }
+    </script>
+    </body>
+    </html>
